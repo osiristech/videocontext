@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "videocontext"
+version = "0.1.0"
+description = "Extract video context (transcripts, metadata) for AI CLI consumption"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Soloarch" }
+]
+dependencies = [
+    "youtube-transcript-api>=1.2.0",
+    "yt-dlp>=2025.1.0",
+    "click>=8.0.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+vision = ["scenedetect[opencv]>=0.6.0"]
+test = ["pytest>=8.0.0"]
+dev = [
+    "ruff>=0.11.0",
+    "pre-commit>=4.0.0",
+    "build>=1.2.0",
+    "twine>=6.0.0",
+]
+
+[project.scripts]
+videocontext = "videocontext.cli:cli"
+vc = "videocontext.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

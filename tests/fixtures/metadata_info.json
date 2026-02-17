@@ -1,0 +1,20 @@
+{
+  "title": "Fixture Video",
+  "channel": "Fixture Channel",
+  "duration": 372,
+  "upload_date": "20260115",
+  "description": "A fixture description.",
+  "view_count": 12345,
+  "like_count": 678,
+  "tags": ["python", "cli", "testing"],
+  "chapters": [
+    {
+      "start_time": 0,
+      "title": "Intro"
+    },
+    {
+      "start_time": 120,
+      "title": "Implementation"
+    }
+  ]
+}
