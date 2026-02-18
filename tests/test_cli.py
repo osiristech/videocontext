@@ -97,6 +97,16 @@ class TestCli(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertIn("not ready yet", result.output)
 
+    @patch("videocontext.extractors.frames.extract_frames")
+    def test_frames_runtime_error(self, mock_extract_frames):
+        mock_extract_frames.side_effect = RuntimeError("decode failed")
+
+        result = self.runner.invoke(cli, ["frames", self.video_url])
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("Error:", result.output)
+        self.assertIn("decode failed", result.output)
+
 
 if __name__ == "__main__":
     unittest.main()

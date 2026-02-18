@@ -67,7 +67,9 @@ def _download_video(video_id: str, tmpdir: Path) -> tuple[Path, float]:
 
     url = f"https://www.youtube.com/watch?v={video_id}"
     opts = {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        # Prefer single-file H.264 variants first to avoid AV1 decode issues
+        # in OpenCV environments without AV1 support.
+        "format": "best[ext=mp4][vcodec*=avc1]/best[vcodec*=avc1]/best[ext=mp4]/best",
         "merge_output_format": "mp4",
         "outtmpl": str(tmpdir / "%(id)s.%(ext)s"),
         "quiet": True,

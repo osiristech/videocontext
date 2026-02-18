@@ -6,6 +6,7 @@ import sys
 
 import click
 from rich.console import Console
+from rich.markup import escape
 
 from videocontext.url import extract_video_id
 
@@ -21,6 +22,14 @@ def _write_output(text: str, output: str | None) -> None:
         err_console.print(f"[green]Written to {output}[/green]")
     else:
         click.echo(text)
+
+
+def _print_error(message: str) -> None:
+    err_console.print(f"[red]Error:[/red] {escape(message)}")
+
+
+def _print_warning(message: str) -> None:
+    err_console.print(f"[yellow]Warning:[/yellow] {escape(message)}")
 
 
 @click.group()
@@ -43,14 +52,14 @@ def transcript(url: str, fmt: str, lang: str, output: str | None):
     try:
         video_id = extract_video_id(url)
     except ValueError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
+        _print_error(str(e))
         sys.exit(1)
 
     with err_console.status("Fetching transcript..."):
         try:
             segments = fetch_transcript(video_id, lang=lang)
         except RuntimeError as e:
-            err_console.print(f"[red]Error:[/red] {e}")
+            _print_error(str(e))
             sys.exit(1)
 
     if fmt == "json":
@@ -75,14 +84,14 @@ def metadata(url: str, fmt: str, output: str | None):
     try:
         video_id = extract_video_id(url)
     except ValueError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
+        _print_error(str(e))
         sys.exit(1)
 
     with err_console.status("Fetching metadata..."):
         try:
             meta = fetch_metadata(video_id)
         except RuntimeError as e:
-            err_console.print(f"[red]Error:[/red] {e}")
+            _print_error(str(e))
             sys.exit(1)
 
     if fmt == "json":
@@ -109,14 +118,14 @@ def context(url: str, fmt: str, no_transcript: bool, no_chapters: bool, lang: st
     try:
         video_id = extract_video_id(url)
     except ValueError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
+        _print_error(str(e))
         sys.exit(1)
 
     with err_console.status("Fetching metadata..."):
         try:
             meta = fetch_metadata(video_id)
         except RuntimeError as e:
-            err_console.print(f"[red]Error:[/red] {e}")
+            _print_error(str(e))
             sys.exit(1)
 
     segments = None
@@ -125,7 +134,7 @@ def context(url: str, fmt: str, no_transcript: bool, no_chapters: bool, lang: st
             try:
                 segments = fetch_transcript(video_id, lang=lang)
             except RuntimeError as e:
-                err_console.print(f"[yellow]Warning:[/yellow] {e}")
+                _print_warning(str(e))
                 err_console.print("[yellow]Continuing without transcript.[/yellow]")
 
     formatter = {"markdown": markdown, "json": json_fmt, "text": text}[fmt]
@@ -146,7 +155,7 @@ def frames(url: str, interval: float | None, output_dir: str, max_frames: int):
     try:
         video_id = extract_video_id(url)
     except ValueError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
+        _print_error(str(e))
         sys.exit(1)
 
     try:
@@ -154,8 +163,11 @@ def frames(url: str, interval: float | None, output_dir: str, max_frames: int):
         for p in paths:
             click.echo(p)
     except ImportError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
+        _print_error(str(e))
         sys.exit(1)
     except NotImplementedError as e:
-        err_console.print(f"[yellow]{e}[/yellow]")
+        err_console.print(f"[yellow]{escape(str(e))}[/yellow]")
         sys.exit(0)
+    except RuntimeError as e:
+        _print_error(str(e))
+        sys.exit(1)

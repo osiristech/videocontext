@@ -4,6 +4,13 @@ Extract video context (transcripts, metadata) for AI CLI consumption.
 
 YouTube is the largest developer knowledge base — tutorials, talks, demos — but AI CLI tools can't access it. VideoContext bridges that gap: extract video content into structured text that any AI CLI can consume via piping.
 
+## Documentation
+
+- Architecture: `docs/ARCHITECTURE.md`
+- Development workflow: `docs/DEVELOPMENT.md`
+- Troubleshooting: `docs/TROUBLESHOOTING.md`
+- Release setup: `docs/RELEASE_SETUP.md`
+
 ## Install
 
 ```bash
@@ -63,7 +70,7 @@ git push origin videocontext-v0.2.0
 ```
 
 The release workflow uses trusted publishing (`.github/workflows/videocontext-release.yml`), so configure your PyPI project to trust this repository/workflow.
-Detailed setup steps are in `projects/videocontext/docs/RELEASE_SETUP.md`.
+Detailed setup steps are in `docs/RELEASE_SETUP.md`.
 
 ## Live Smoke Test (Optional)
 
