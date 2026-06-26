@@ -33,6 +33,11 @@ class TestCli(unittest.TestCase):
         self.assertEqual(result.exit_code, 1)
         self.assertIn("Not a YouTube URL", result.output)
 
+    def test_save_invalid_url_returns_error(self):
+        result = self.runner.invoke(cli, ["save", "not-a-youtube-url"])
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("Not a YouTube URL", result.output)
+
     @patch("videocontext.extractors.metadata.fetch_metadata")
     @patch("videocontext.extractors.transcript.fetch_transcript")
     def test_context_continues_without_transcript(self, mock_fetch_transcript, mock_fetch_metadata):
@@ -106,6 +111,65 @@ class TestCli(unittest.TestCase):
         self.assertEqual(result.exit_code, 1)
         self.assertIn("Error:", result.output)
         self.assertIn("decode failed", result.output)
+
+    @patch("videocontext.bundle.save_bundle")
+    def test_save_success_prints_bundle_files(self, mock_save_bundle):
+        mock_save_bundle.return_value = {
+            "output_dir": "out/dQw4w9WgXcQ",
+            "files": ["context.md", "manifest.json"],
+            "warnings": [],
+        }
+
+        result = self.runner.invoke(cli, ["save", self.video_url, "--output-dir", "out"])
+
+        self.assertEqual(result.exit_code, 0)
+        mock_save_bundle.assert_called_once_with(
+            "dQw4w9WgXcQ",
+            output_dir="out",
+            lang="en",
+            overwrite=False,
+        )
+        self.assertIn("Saved bundle to out/dQw4w9WgXcQ", result.output)
+        self.assertIn("out/dQw4w9WgXcQ/context.md", result.output)
+
+    @patch("videocontext.bundle.save_bundle")
+    def test_save_prints_transcript_warning(self, mock_save_bundle):
+        mock_save_bundle.return_value = {
+            "output_dir": "out/dQw4w9WgXcQ",
+            "files": ["context.md"],
+            "warnings": ["transcript unavailable"],
+        }
+
+        result = self.runner.invoke(cli, ["save", self.video_url])
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("Warning:", result.output)
+        self.assertIn("transcript unavailable", result.output)
+
+    @patch("videocontext.bundle.save_bundle")
+    def test_save_existing_bundle_returns_error(self, mock_save_bundle):
+        from videocontext.bundle import BundleExistsError
+
+        mock_save_bundle.side_effect = BundleExistsError("Output folder already exists")
+
+        result = self.runner.invoke(cli, ["save", self.video_url])
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("Output folder already exists", result.output)
+
+    @patch("videocontext.bundle.open_folder")
+    @patch("videocontext.bundle.save_bundle")
+    def test_save_open_opens_bundle_folder(self, mock_save_bundle, mock_open_folder):
+        mock_save_bundle.return_value = {
+            "output_dir": "out/dQw4w9WgXcQ",
+            "files": [],
+            "warnings": [],
+        }
+
+        result = self.runner.invoke(cli, ["save", self.video_url, "--open"])
+
+        self.assertEqual(result.exit_code, 0)
+        mock_open_folder.assert_called_once_with("out/dQw4w9WgXcQ")
 
 
 if __name__ == "__main__":

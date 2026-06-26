@@ -1,5 +1,6 @@
 PYTHON ?= python
 VENV_ACTIVATE = . .venv/bin/activate
+PACKAGE_PATH = PYTHONPATH=src
 
 .PHONY: help dev-install test test-quiet lint lint-fix precommit-install precommit-run smoke bump build check-dist release-check
 
@@ -19,10 +20,10 @@ help:
 	@echo "  make release-check        Test + build + artifact validation"
 
 test:
-	@$(VENV_ACTIVATE) && $(PYTHON) -m unittest discover -s tests -v
+	@$(VENV_ACTIVATE) && $(PACKAGE_PATH) $(PYTHON) -m unittest discover -s tests -v
 
 test-quiet:
-	@$(VENV_ACTIVATE) && $(PYTHON) -m unittest discover -s tests -q
+	@$(VENV_ACTIVATE) && $(PACKAGE_PATH) $(PYTHON) -m unittest discover -s tests -q
 
 dev-install:
 	@$(VENV_ACTIVATE) && $(PYTHON) -m pip install --upgrade -e ".[dev,test]"

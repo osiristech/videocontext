@@ -26,8 +26,8 @@ pip install -e ".[vision]"
 # Use test extras (pytest available if preferred)
 pip install -e ".[test]"
 
-# Built-in test run (works without pytest)
-python -m unittest discover -s tests -v
+# Built-in test run (works without pytest or editable install)
+PYTHONPATH=src python -m unittest discover -s tests -v
 
 # Or use shortcuts
 make test
@@ -76,6 +76,7 @@ Detailed setup steps are in `docs/RELEASE_SETUP.md`.
 
 ```bash
 # Requires network + YouTube access
+# Runs against the local source tree, no console-script install required
 ./scripts/smoke_e2e.sh
 make smoke URL="https://www.youtube.com/watch?v=dQw4w9WgXcQ" OUT=./smoke_out
 
@@ -86,6 +87,12 @@ make smoke URL="https://www.youtube.com/watch?v=dQw4w9WgXcQ" OUT=./smoke_out
 ## Usage
 
 ```bash
+# Save a complete local bundle (recommended)
+vc save "https://youtube.com/watch?v=abc123"
+
+# Save and open the folder in File Explorer
+vc save "https://youtube.com/watch?v=abc123" --open
+
 # Full context — metadata + transcript (default: markdown)
 videocontext context "https://youtube.com/watch?v=abc123"
 
@@ -114,10 +121,22 @@ vc context "https://youtube.com/watch?v=abc123" -f json
 vc context "https://youtube.com/watch?v=abc123" -o notes.md
 ```
 
+`vc save` creates a folder under `./videocontext-output/<video-id>/` with:
+
+- `metadata.json`
+- `metadata.md`
+- `transcript.txt`
+- `transcript.md`
+- `transcript.json`
+- `context.md`
+- `context.html`
+- `manifest.json`
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
+| `save` | Save metadata, transcript, context, HTML, and manifest files |
 | `context` | Full video context (metadata + transcript) |
 | `transcript` | Transcript only |
 | `metadata` | Metadata only (title, description, chapters) |
