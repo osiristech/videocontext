@@ -5,7 +5,7 @@ import unittest
 
 from videocontext.extractors.metadata import Chapter, VideoMetadata
 from videocontext.extractors.transcript import TranscriptSegment
-from videocontext.formatters import json_fmt, markdown, text
+from videocontext.formatters import html, json_fmt, markdown, text
 
 
 def _sample_meta() -> VideoMetadata:
@@ -60,6 +60,20 @@ class TestTextFormatter(unittest.TestCase):
         output = text.format_full(_sample_meta(), _sample_segments(), include_chapters=False)
         self.assertNotIn("Chapters:", output)
         self.assertIn("Transcript:", output)
+
+
+class TestHtmlFormatter(unittest.TestCase):
+    def test_format_full_escapes_content_and_includes_transcript(self):
+        meta = _sample_meta()
+        meta.title = "Sample <Title>"
+        segments = [TranscriptSegment(start=1.2, duration=2.0, text="hello <world>")]
+
+        output = html.format_full(meta, segments)
+
+        self.assertIn("<!DOCTYPE html>", output)
+        self.assertIn("Sample &lt;Title&gt;", output)
+        self.assertIn("hello &lt;world&gt;", output)
+        self.assertIn("<h2>Transcript</h2>", output)
 
 
 if __name__ == "__main__":

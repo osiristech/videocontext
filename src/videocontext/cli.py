@@ -74,12 +74,12 @@ def transcript(url: str, fmt: str, lang: str, output: str | None):
 
 @cli.command()
 @click.argument("url")
-@click.option("-f", "--format", "fmt", type=click.Choice(["markdown", "json"]), default="markdown", help="Output format.")
+@click.option("-f", "--format", "fmt", type=click.Choice(["markdown", "json", "html"]), default="markdown", help="Output format.")
 @click.option("-o", "--output", default=None, help="Output file (default: stdout).")
 def metadata(url: str, fmt: str, output: str | None):
     """Extract video metadata (title, description, chapters, tags, duration)."""
     from videocontext.extractors.metadata import fetch_metadata
-    from videocontext.formatters import json_fmt, markdown
+    from videocontext.formatters import html, json_fmt, markdown
 
     try:
         video_id = extract_video_id(url)
@@ -96,6 +96,8 @@ def metadata(url: str, fmt: str, output: str | None):
 
     if fmt == "json":
         result = json_fmt.format_metadata(meta)
+    elif fmt == "html":
+        result = html.format_metadata(meta)
     else:
         result = markdown.format_metadata(meta)
 
@@ -104,7 +106,7 @@ def metadata(url: str, fmt: str, output: str | None):
 
 @cli.command()
 @click.argument("url")
-@click.option("-f", "--format", "fmt", type=click.Choice(["markdown", "json", "text"]), default="markdown", help="Output format.")
+@click.option("-f", "--format", "fmt", type=click.Choice(["markdown", "json", "text", "html"]), default="markdown", help="Output format.")
 @click.option("--no-transcript", is_flag=True, help="Metadata only, skip transcript.")
 @click.option("--no-chapters", is_flag=True, help="Skip chapter markers.")
 @click.option("-l", "--lang", default="en", help="Transcript language code.")
@@ -113,7 +115,7 @@ def context(url: str, fmt: str, no_transcript: bool, no_chapters: bool, lang: st
     """Full video context — metadata + transcript, formatted for AI consumption."""
     from videocontext.extractors.metadata import fetch_metadata
     from videocontext.extractors.transcript import fetch_transcript
-    from videocontext.formatters import json_fmt, markdown, text
+    from videocontext.formatters import html, json_fmt, markdown, text
 
     try:
         video_id = extract_video_id(url)
@@ -137,7 +139,7 @@ def context(url: str, fmt: str, no_transcript: bool, no_chapters: bool, lang: st
                 _print_warning(str(e))
                 err_console.print("[yellow]Continuing without transcript.[/yellow]")
 
-    formatter = {"markdown": markdown, "json": json_fmt, "text": text}[fmt]
+    formatter = {"markdown": markdown, "json": json_fmt, "text": text, "html": html}[fmt]
     result = formatter.format_full(meta, segments, include_chapters=not no_chapters)
 
     _write_output(result, output)
@@ -171,3 +173,41 @@ def frames(url: str, interval: float | None, output_dir: str, max_frames: int):
     except RuntimeError as e:
         _print_error(str(e))
         sys.exit(1)
+
+
+@cli.command()
+@click.argument("url")
+@click.option("--output-dir", default="./videocontext-output", help="Root directory for saved bundles.")
+@click.option("-l", "--lang", default="en", help="Transcript language code.")
+@click.option("--open", "open_after", is_flag=True, help="Open the saved folder in File Explorer.")
+@click.option("--overwrite", is_flag=True, help="Replace an existing bundle folder.")
+def save(url: str, output_dir: str, lang: str, open_after: bool, overwrite: bool):
+    """Save metadata, transcript, context, HTML, and a manifest."""
+    from videocontext.bundle import BundleExistsError, open_folder, save_bundle
+
+    try:
+        video_id = extract_video_id(url)
+    except ValueError as e:
+        _print_error(str(e))
+        sys.exit(1)
+
+    with err_console.status("Saving video context bundle..."):
+        try:
+            manifest = save_bundle(video_id, output_dir=output_dir, lang=lang, overwrite=overwrite)
+        except BundleExistsError as e:
+            _print_error(str(e))
+            sys.exit(1)
+        except RuntimeError as e:
+            _print_error(str(e))
+            sys.exit(1)
+
+    for warning in manifest["warnings"]:
+        _print_warning(warning)
+
+    bundle_dir = manifest["output_dir"]
+    err_console.print(f"[green]Saved bundle to {escape(bundle_dir)}[/green]")
+    for filename in manifest["files"]:
+        click.echo(f"{bundle_dir}/{filename}")
+
+    if open_after:
+        open_folder(bundle_dir)
