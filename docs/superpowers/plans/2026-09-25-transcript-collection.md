@@ -55,4 +55,4 @@
 - [x] Install the updated local build, organize IndyDevDan offline, and compare every transcript hash.
 - [x] Restart the batch against durable metadata paths and inspect its first output.
 - [x] Inspect the Git diff, syntax, package install, collection counts, and generated catalog; commit only this branch's work.
-- [ ] Push the branch to `origin` and update `main` only if repository access and branch policy allow it.
+- [x] Push the branch to `origin` and update `main` only if repository access and branch policy allow it.
