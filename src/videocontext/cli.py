@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import click
 from rich.console import Console
@@ -70,6 +71,62 @@ def transcript(url: str, fmt: str, lang: str, output: str | None):
         result = "\n".join(seg.text for seg in segments)
 
     _write_output(result, output)
+
+
+@cli.command("batch-transcripts")
+@click.argument("ids_file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("-o", "--output-dir", required=True, type=click.Path(path_type=Path), help="Directory for per-video text files.")
+@click.option("-l", "--lang", default="en", show_default=True, help="Transcript language code.")
+@click.option("--interval", type=click.FloatRange(min=0), default=120.0, show_default=True, help="Seconds between video requests.")
+@click.option("--initial-cooldown", type=click.FloatRange(min=1), default=1800.0, show_default=True, help="First wait after a rate limit, in seconds.")
+@click.option("--max-cooldown", type=click.FloatRange(min=1), default=7200.0, show_default=True, help="Maximum wait after repeated rate limits, in seconds.")
+@click.option("--max-rate-retries", type=click.IntRange(min=0), default=6, show_default=True, help="Retries for one blocked video before pausing the batch.")
+@click.option("--retry-forever", is_flag=True, help="Keep waiting and retrying rate limits until interrupted.")
+@click.option("--status", is_flag=True, help="Show saved and pending counts without network requests.")
+@click.option("--titles-file", type=click.Path(exists=True, dir_okay=False, path_type=Path),
+              help="Local ID-and-title inventory (tab-separated), avoiding title lookup requests.")
+@click.option("--organize-only", "--migrate-only", is_flag=True,
+              help="Organize saved transcripts and generate the catalog without network requests.")
+def batch_transcripts(
+    ids_file: Path, output_dir: Path, lang: str, interval: float,
+    initial_cooldown: float, max_cooldown: float, max_rate_retries: int,
+    retry_forever: bool, status: bool, titles_file: Path | None, organize_only: bool,
+):
+    """Download any length list of YouTube IDs or URLs, resuming saved files."""
+    from videocontext.batch import BatchPaused, download_transcripts, inspect_batch, organize_collection
+
+    try:
+        if status:
+            counts = inspect_batch(ids_file, output_dir)
+            click.echo(f"{counts.total} videos: {counts.saved} saved, {counts.pending} pending")
+            return
+        if organize_only:
+            moved = organize_collection(ids_file, output_dir, titles_file)
+            click.echo(f"Organized collection; moved {moved} transcripts.")
+            return
+
+        summary = download_transcripts(
+            ids_file, output_dir, lang=lang, interval=interval,
+            initial_cooldown=initial_cooldown, max_cooldown=max_cooldown,
+            max_rate_retries=None if retry_forever else max_rate_retries,
+            titles_file=titles_file,
+            progress=lambda message: click.echo(message, err=True),
+        )
+    except BatchPaused as error:
+        _print_error(str(error))
+        click.echo(
+            f"Paused: {error.summary.completed} saved, {error.summary.skipped} skipped, "
+            f"{error.summary.failed} failed this run; rerun to resume.", err=True,
+        )
+        sys.exit(75)
+    except (OSError, RuntimeError, ValueError) as error:
+        _print_error(str(error))
+        sys.exit(1)
+
+    click.echo(
+        f"Batch complete: {summary.completed} saved, {summary.skipped} skipped, "
+        f"{summary.failed} failed, {summary.rate_limit_retries} rate-limit retries."
+    )
 
 
 @cli.command()

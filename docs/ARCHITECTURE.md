@@ -13,12 +13,19 @@ VideoContext is a Python CLI that extracts YouTube content for AI workflows.
 4. Output is formatted (`src/videocontext/formatters/*`).
 5. Result is printed to stdout or written to file.
 6. Bundle output is coordinated by `src/videocontext/bundle.py`.
+7. Bulk transcript output is coordinated by `src/videocontext/batch.py`; it validates a complete input list, resolves video titles, tracks relative filenames in `metadata/batch_index.json`, skips saved results, writes each new transcript atomically, and refreshes `CATALOG.md`.
 
 ## Commands and Modules
 
 - `vc transcript`:
   - Extract transcript segments
   - Formats: `text`, `timestamped`, `json`
+- `vc batch-transcripts`:
+  - Accept an arbitrary-length file of video IDs or URLs
+  - Process requests sequentially, pause and retry the current video after rate limits, and resume from saved text files
+  - Name transcript files `transcripts/<title> [<video-id>].txt`; `--titles-file` supplies local titles and `--organize-only` migrates earlier files offline
+  - Keep video lists and the resume index in `metadata/`, with batch failures in `logs/batch_failures.jsonl`
+  - Generate an alphabetical `CATALOG.md` with links to saved transcripts
 - `vc save`:
   - Saves metadata, transcript, context, HTML, and a manifest
   - Uses `<output-dir>/<video-id>/` bundle folders
@@ -36,6 +43,7 @@ VideoContext is a Python CLI that extracts YouTube content for AI workflows.
 
 - User-facing errors are emitted through rich-safe helpers in CLI.
 - Invalid URLs and extraction failures return non-zero exit codes.
+- Transcript rate limits are preserved as a distinct error and do not trigger the fallback extractor. Persistent rate limits pause a batch with exit status 75.
 - `context` can continue without transcript when metadata succeeds.
 
 ## Testing Strategy

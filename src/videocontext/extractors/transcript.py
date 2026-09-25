@@ -2,7 +2,71 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from urllib.error import HTTPError
+
+from youtube_transcript_api import RequestBlocked
+
+
+class RateLimitedError(RuntimeError):
+    """YouTube rejected transcript requests because of request volume."""
+
+    def __init__(self, message: str, retry_after: float | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+def _retry_after_seconds(error: Exception) -> float | None:
+    pending: list[BaseException] = [error]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        if isinstance(current, HTTPError) and current.code == 429:
+            value = current.headers.get("Retry-After") if current.headers else None
+            if value:
+                try:
+                    return max(0, float(value))
+                except ValueError:
+                    try:
+                        retry_at = parsedate_to_datetime(value)
+                        if retry_at.tzinfo is None:
+                            retry_at = retry_at.replace(tzinfo=timezone.utc)
+                        return max(0, (retry_at - datetime.now(timezone.utc)).total_seconds())
+                    except (TypeError, ValueError, OverflowError):
+                        pass
+        if current.__cause__ is not None:
+            pending.append(current.__cause__)
+        if current.__context__ is not None:
+            pending.append(current.__context__)
+    return None
+
+
+def _is_rate_limited(error: Exception) -> bool:
+    """Recognize blocks from either transcript backend and chained HTTP errors."""
+    seen: set[int] = set()
+    pending: list[BaseException] = [error]
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        if isinstance(current, RequestBlocked):
+            return True
+        if isinstance(current, HTTPError) and current.code == 429:
+            return True
+        if re.search(r"\bHTTP(?: Error)?\s*429\b", str(current), re.IGNORECASE):
+            return True
+        if current.__cause__ is not None:
+            pending.append(current.__cause__)
+        if current.__context__ is not None:
+            pending.append(current.__context__)
+    return False
 
 
 @dataclass
@@ -29,20 +93,34 @@ def fetch_transcript(video_id: str, lang: str = "en") -> list[TranscriptSegment]
     Raises:
         RuntimeError: If no transcript could be retrieved.
     """
-    # Try youtube-transcript-api first
+    # A block applies to both backends; immediately trying the fallback adds traffic.
     try:
-        return _fetch_via_api(video_id, lang)
-    except Exception:
-        pass
+        segments = _fetch_via_api(video_id, lang)
+        if not segments:
+            raise RuntimeError("Primary transcript source returned no text")
+        return segments
+    except Exception as error:
+        if _is_rate_limited(error):
+            raise RateLimitedError(
+                f"YouTube transcript rate limit reached for video {video_id}. Retry later.",
+                retry_after=_retry_after_seconds(error),
+            ) from error
 
     # Fallback to yt-dlp subtitle extraction
     try:
-        return _fetch_via_ytdlp(video_id, lang)
-    except Exception as e:
+        segments = _fetch_via_ytdlp(video_id, lang)
+        if not segments:
+            raise RuntimeError("Fallback transcript source returned no text")
+        return segments
+    except Exception as error:
+        if _is_rate_limited(error):
+            raise RateLimitedError(
+                f"YouTube transcript rate limit reached for video {video_id}. Retry later.",
+                retry_after=_retry_after_seconds(error),
+            ) from error
         raise RuntimeError(
-            f"Could not retrieve transcript for video {video_id}.\n"
-            f"The video may not have captions available in '{lang}'."
-        ) from e
+            f"Could not retrieve transcript for video {video_id} in '{lang}'."
+        ) from error
 
 
 def _fetch_via_api(video_id: str, lang: str) -> list[TranscriptSegment]:

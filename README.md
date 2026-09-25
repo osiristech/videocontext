@@ -102,6 +102,21 @@ videocontext context "https://youtube.com/watch?v=abc123" | claude
 # Transcript only
 videocontext transcript "https://youtube.com/watch?v=abc123"
 
+# A file with one video ID or YouTube URL per line, with no list-size limit
+videocontext batch-transcripts ids.txt --output-dir ~/Transcripts/my-channel
+
+# Check progress without contacting YouTube; rerun the download command to resume
+videocontext batch-transcripts ids.txt --output-dir ~/Transcripts/my-channel --status
+
+# Use a local ID-and-title inventory to avoid extra YouTube title requests
+videocontext batch-transcripts ids.txt --titles-file titles.tsv --output-dir ~/Transcripts/my-channel
+
+# Rename previously saved ID-named files offline, preserving their contents
+videocontext batch-transcripts ids.txt --titles-file titles.tsv --output-dir ~/Transcripts/my-channel --migrate-only
+
+# Organize an existing collection and build its searchable catalog without network access
+videocontext batch-transcripts ids.txt --titles-file titles.tsv --output-dir ~/Transcripts/my-channel --organize-only
+
 # Metadata only
 videocontext metadata "https://youtube.com/watch?v=abc123"
 
@@ -139,9 +154,22 @@ vc context "https://youtube.com/watch?v=abc123" -o notes.md
 | `save` | Save metadata, transcript, context, HTML, and manifest files |
 | `context` | Full video context (metadata + transcript) |
 | `transcript` | Transcript only |
+| `batch-transcripts` | Paced, resumable transcripts from a list of video IDs or URLs |
 | `metadata` | Metadata only (title, description, chapters) |
 | `frames` | Key frame extraction (scene-detect or fixed-interval, requires `[vision]` extra) |
 
 ## No API Keys Required
 
 VideoContext uses `youtube-transcript-api` and `yt-dlp` — no Google API key needed.
+
+## Bulk Transcript Downloads
+
+`batch-transcripts` accepts a text file with one bare video ID or YouTube URL per line. Blank lines, lines beginning with `#`, and duplicate IDs are ignored. It saves each transcript as `transcripts/<original video title> [<YouTube ID>].txt`, replacing only characters unsafe in filenames. `metadata/batch_index.json` records the ID-to-filename mapping so reruns skip completed videos. There is no application limit on the number of videos in the list.
+
+Each output directory is a browsable collection: `CATALOG.md` lists every video alphabetically, links saved transcripts, and shows pending videos. `metadata/video_ids.txt` and `metadata/video_titles.tsv` keep the source lists available for later runs. `logs/` holds batch failures and download logs. Existing flat collections can be moved into this layout with `--organize-only` (or its older alias `--migrate-only`); organization uses local data and makes no YouTube requests. The command refuses to overwrite an unrelated file or a user-authored `CATALOG.md`.
+
+By default, VideoContext fetches the title before the transcript. To avoid these extra requests, pass `--titles-file` with one `video-id<TAB>title` per line; extra tab-separated columns are ignored. Once supplied, the inventory is stored in the collection and reused on subsequent runs. `--organize-only` uses it to rename existing transcripts without contacting YouTube. The original transcript text is preserved.
+
+Requests run one at a time. By default, VideoContext waits 120 seconds between videos; this is a conservative starting interval, not a guaranteed safe rate. If YouTube returns a rate limit, it stops making new requests, waits 30 minutes initially, and retries the same video with increasing cooldowns up to two hours. A server `Retry-After` value is honored when available. After six unsuccessful rate-limit retries, the command exits with status 75; run it again later to resume. Use `--retry-forever` to keep waiting until the block clears or you interrupt the command. Delays can be tuned with `--interval`, `--initial-cooldown`, and `--max-cooldown`.
+
+Other transcript failures are recorded in `logs/batch_failures.jsonl` and the command continues with the next video. Rate limits are reported separately from unavailable captions. YouTube may still block requests or have videos without captions; an unlimited queue does not imply unlimited simultaneous requests or guaranteed transcript availability.
