@@ -10,6 +10,8 @@ from urllib.error import HTTPError
 
 from youtube_transcript_api import RequestBlocked
 
+from videocontext.network import configured_proxy, yt_dlp_proxy_options
+
 
 class RateLimitedError(RuntimeError):
     """YouTube rejected transcript requests because of request volume."""
@@ -93,6 +95,7 @@ def fetch_transcript(video_id: str, lang: str = "en") -> list[TranscriptSegment]
     Raises:
         RuntimeError: If no transcript could be retrieved.
     """
+    configured_proxy()  # Surface configuration errors before trying either backend.
     # A block applies to both backends; immediately trying the fallback adds traffic.
     try:
         segments = _fetch_via_api(video_id, lang)
@@ -126,8 +129,11 @@ def fetch_transcript(video_id: str, lang: str = "en") -> list[TranscriptSegment]
 def _fetch_via_api(video_id: str, lang: str) -> list[TranscriptSegment]:
     """Fetch transcript using youtube-transcript-api."""
     from youtube_transcript_api import YouTubeTranscriptApi
+    from youtube_transcript_api.proxies import GenericProxyConfig
 
-    ytt_api = YouTubeTranscriptApi()
+    proxy = configured_proxy()
+    proxy_config = GenericProxyConfig(http_url=proxy, https_url=proxy) if proxy else None
+    ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
     transcript = ytt_api.fetch(video_id, languages=[lang, f"{lang}-auto", f"a.{lang}"])
 
     return [
@@ -159,6 +165,7 @@ def _fetch_via_ytdlp(video_id: str, lang: str) -> list[TranscriptSegment]:
             "quiet": True,
             "no_warnings": True,
         }
+        opts.update(yt_dlp_proxy_options())
 
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([f"https://www.youtube.com/watch?v={video_id}"])

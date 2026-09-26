@@ -20,6 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+proxy = ["PySocks>=1.7.1"]
 vision = ["scenedetect[opencv]>=0.6.0"]
 test = ["pytest>=8.0.0"]
 dev = [

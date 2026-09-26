@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from videocontext.network import yt_dlp_proxy_options
+
 
 @dataclass
 class Chapter:
@@ -49,11 +51,15 @@ def fetch_metadata(video_id: str) -> VideoMetadata:
         "quiet": True,
         "no_warnings": True,
     }
+    opts.update(yt_dlp_proxy_options())
+    proxy_active = "proxy" in opts
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
     except Exception as e:
+        if proxy_active:
+            raise RuntimeError(f"Could not retrieve metadata for video {video_id}") from e
         raise RuntimeError(f"Could not retrieve metadata for video {video_id}: {e}") from e
 
     if info is None:

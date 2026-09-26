@@ -65,6 +65,8 @@ def _ensure_vision_dependencies() -> None:
 def _download_video(video_id: str, tmpdir: Path) -> tuple[Path, float]:
     import yt_dlp
 
+    from videocontext.network import yt_dlp_proxy_options
+
     url = f"https://www.youtube.com/watch?v={video_id}"
     opts = {
         # Prefer single-file H.264 variants first to avoid AV1 decode issues
@@ -76,12 +78,16 @@ def _download_video(video_id: str, tmpdir: Path) -> tuple[Path, float]:
         "no_warnings": True,
         "noplaylist": True,
     }
+    opts.update(yt_dlp_proxy_options())
+    proxy_active = "proxy" in opts
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
             file_path = Path(ydl.prepare_filename(info))
     except Exception as e:
+        if proxy_active:
+            raise RuntimeError(f"Could not download video {video_id} for frame extraction") from e
         raise RuntimeError(f"Could not download video {video_id} for frame extraction: {e}") from e
 
     if not file_path.exists():

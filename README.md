@@ -173,3 +173,9 @@ By default, VideoContext fetches the title before the transcript. To avoid these
 Requests run one at a time. By default, VideoContext waits 120 seconds between videos; this is a conservative starting interval, not a guaranteed safe rate. If YouTube returns a rate limit, it stops making new requests, waits 30 minutes initially, and retries the same video with increasing cooldowns up to two hours. A server `Retry-After` value is honored when available. After six unsuccessful rate-limit retries, the command exits with status 75; run it again later to resume. Use `--retry-forever` to keep waiting until the block clears or you interrupt the command. Delays can be tuned with `--interval`, `--initial-cooldown`, and `--max-cooldown`.
 
 Other transcript failures are recorded in `logs/batch_failures.jsonl` and the command continues with the next video. Rate limits are reported separately from unavailable captions. YouTube may still block requests or have videos without captions; an unlimited queue does not imply unlimited simultaneous requests or guaranteed transcript availability.
+
+### Optional proxy route
+
+Set `VIDEOCONTEXT_PROXY_FILE` to a text file containing one HTTP, HTTPS, SOCKS4, or SOCKS5 proxy URL. VideoContext uses that route for transcripts, metadata, and frame downloads. Keep the file private if its URL contains credentials (for example, `chmod 600 /path/to/proxy-url.txt`). `VIDEOCONTEXT_PROXY` can hold the URL directly when a file is inconvenient; the file takes precedence if both are set. Install `videocontext[proxy]` for SOCKS support.
+
+A proxy is optional and is not bundled with VideoContext. It may also be rate limited by YouTube. Existing batch collections remain resumable when changing network routes; do not run two downloaders against the same collection at once.
